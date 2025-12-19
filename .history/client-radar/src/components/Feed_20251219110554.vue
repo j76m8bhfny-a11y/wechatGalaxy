@@ -2,7 +2,7 @@
 import { useMomentsStore } from '../stores/moments';
 import { useContactsStore } from '../stores/contacts';
 import { MoreHorizontal, FilterX, Heart } from 'lucide-vue-next';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/tauri'; // 👈 1. 引入转换工具
 
 const store = useMomentsStore();
 const contactStore = useContactsStore();
