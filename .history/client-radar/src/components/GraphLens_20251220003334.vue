@@ -223,8 +223,8 @@ const chartOption = computed(() => {
         draggable: true,
         // 🔥 [关键修改4] 调整力导向参数，让长链条能舒展开
         force: {
-          repulsion: 350, // 增大斥力
-          gravity: 0.02,  // 减小引力，让节点更松散
+          repulsion: 450, // 增大斥力
+          gravity: 0.04,  // 减小引力，让节点更松散
           edgeLength: [40, 200], // 允许边更长
           layoutAnimation: true,
           friction: 0.6

@@ -89,7 +89,6 @@ const selectContact = (wxid: string) => {
       <div class="relative">
         <Search class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
         <input 
-          v-model="searchQuery"
           type="text" 
           placeholder="搜索联系人..." 
           class="w-full pl-9 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
@@ -133,7 +132,7 @@ const selectContact = (wxid: string) => {
 
     <div class="flex-1 overflow-y-auto scrollbar-hide">
       <div 
-        v-for="contact in filteredContacts" 
+        v-for="contact in store.contacts" 
         :key="contact.id"
         @click="selectContact(contact.id)"
         :class="['flex items-center p-3 cursor-pointer transition-colors hover:bg-white', 
@@ -161,11 +160,6 @@ const selectContact = (wxid: string) => {
           </div>
         </div>
       </div>
-      
-      <div v-if="filteredContacts.length === 0" class="text-center text-slate-400 py-10 text-xs">
-        未找到相关联系人
-      </div>
-
     </div>
   </div>
 </template>

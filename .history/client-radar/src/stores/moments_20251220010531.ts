@@ -152,13 +152,14 @@ export const useMomentsStore = defineStore('moments', () => {
   });
 
   const filteredMoments = computed(() => {
-    // 🔥 模式一：雷达追踪模式 (点击了图谱中的节点，例如 C)
+    // 🔥 模式一：雷达追踪模式 (点击了图谱中的节点 B)
     if (filterWxid.value) {
-      const targetId = filterWxid.value; 
+      const targetId = filterWxid.value; // 选中的人 B
+      const rootId = selectedWxid.value; // 左侧的主角 A
 
       return moments.value.filter(m => {
-        // 1. 【主动出击】：C 去点赞、评论了别人
-        // (保持不变：展示 C 在任何地方留下的痕迹)
+        // 1. 【B 主动互动】在别人的地盘 (覆盖 B 和 C 在别人朋友圈互动)
+        // 只要 B 点赞了，或者 B 评论了，或者是 B 被人回复了(参与了对话)，都算
         const targetIsActive = 
           (m.interactions?.likes && m.interactions.likes.some(u => u.wxid === targetId)) ||
           (m.interactions?.comments && m.interactions.comments.some(c => 
@@ -167,17 +168,15 @@ export const useMomentsStore = defineStore('moments', () => {
         
         if (targetIsActive) return true;
 
-        // 2. 【被动吸引】：C 发的朋友圈，被别人（B、A或其他链路节点）互动了
-        // (修改点：不再强制要求是 rootId(A) 互动，只要有“他人”互动即可)
+        // 2. 【B 被 A 互动】在 B 自己的地盘 (覆盖 A 评论 B)
+        // 只有当作者是 B，且 A (核心人物) 参与了互动时，才显示
+        // 这样就过滤掉了 "B 自己发了条朋友圈但 A 没理他" 的情况
         if (m.author_wxid === targetId) {
-           const hasInteractions = 
-             (m.interactions?.likes && m.interactions.likes.some(u => u.wxid !== targetId)) ||
-             (m.interactions?.comments && m.interactions.comments.some(c => c.wxid !== targetId));
+           const rootInteracted = 
+             (m.interactions?.likes && m.interactions.likes.some(u => u.wxid === rootId)) ||
+             (m.interactions?.comments && m.interactions.comments.some(c => c.wxid === rootId));
            
-           // 只要有人理他（形成了社交连线），就展示
-           // 这样 B 评论 C 的朋友圈就能显示出来了
-           // 同时依然过滤掉了 C 发的“无人问津”的自言自语
-           if (hasInteractions) return true;
+           if (rootInteracted) return true;
         }
 
         return false;
@@ -185,6 +184,7 @@ export const useMomentsStore = defineStore('moments', () => {
     }
 
     // 🔥 模式二：单人查看模式 (左侧选了 A，中间没点球)
+    // 只看 A 发的朋友圈
     if (selectedWxid.value) {
       return moments.value.filter(m => m.author_wxid === selectedWxid.value);
     }

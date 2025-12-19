@@ -185,23 +185,12 @@ const chartOption = computed(() => {
   });
 
   return {
-    // 🔥 [修改点1]：定义5种颜色
-    // 0:蓝(核心) 1:橙(密友) 2:紫(二层) 3:青(三层) 4:灰(边缘)
-    color: ['#3b82f6', '#f97316', '#8b5cf6', '#06b6d4', '#94a3b8'],
-
+    color: ['#3b82f6', '#f97316', '#94a3b8'], 
     tooltip: { trigger: 'item', formatter: '{b}' },
-    
     legend: { 
       show: true, 
       bottom: 20, 
-      data: [
-        {name: '核心人物'}, 
-        {name: '一级密友'}, 
-        {name: '二级互动'}, 
-        {name: '三级扩散'}, 
-        {name: '深层链路'}
-      ],
-      textStyle: { fontSize: 10 }
+      data: [{name: '核心人物'}, {name: '一级密友'}, {name: '边缘关联'}]
     },
     series: [
       {
@@ -209,23 +198,14 @@ const chartOption = computed(() => {
         layout: 'force',
         data: resultNodes,
         links: resultLinks,
-
-        // 🔥 [修改点3]：分类定义必须和 legend 名字一致，且顺序对应 0,1,2,3,4
-        categories: [
-          { name: '核心人物' }, // level 0
-          { name: '一级密友' }, // level 1
-          { name: '二级互动' }, // level 2
-          { name: '三级扩散' }, // level 3
-          { name: '深层链路' }  // level 4
-        ],
-
+        categories: [{ name: '核心人物' }, { name: '一级密友' }, { name: '边缘关联' }],
         roam: true,
         draggable: true,
         // 🔥 [关键修改4] 调整力导向参数，让长链条能舒展开
         force: {
-          repulsion: 350, // 增大斥力
-          gravity: 0.02,  // 减小引力，让节点更松散
-          edgeLength: [40, 200], // 允许边更长
+          repulsion: 400, // 增大斥力
+          gravity: 0.05,  // 减小引力，让节点更松散
+          edgeLength: [50, 250], // 允许边更长
           layoutAnimation: true,
           friction: 0.6
         },
