@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMomentsStore } from '../stores/moments';
-import { MoreHorizontal, FilterX, Heart } from 'lucide-vue-next'; // 引入 Heart 图标
+import { MoreHorizontal, FilterX } from 'lucide-vue-next';
 
 const store = useMomentsStore();
 
@@ -23,7 +23,7 @@ const clearFilter = () => {
   store.filterWxid = '';
 };
 
-// 名字美化
+// 简单的名字美化 (和图谱保持一致，Phase 3 会统一处理)
 const formatName = (wxid: string) => {
   if (wxid.length > 10) return `user_${wxid.substring(wxid.length - 4)}`;
   return wxid;
@@ -103,61 +103,44 @@ const formatName = (wxid: string) => {
 
         <div class="flex items-center justify-between pt-2 border-t border-slate-50">
             <div class="flex space-x-3 text-[10px] text-slate-400">
-              <span :class="['flex items-center', moment.interactions.likes.length > 0 ? 'text-slate-600' : '']">
-                <Heart class="w-3 h-3 mr-1" /> {{ moment.interactions.likes.length }}
+              <span 
+                :class="['flex items-center transition-colors', 
+                  moment.interactions.likes.some(u => u.wxid === store.filterWxid) ? 'text-orange-500 font-bold' : 'hover:text-blue-600']"
+              >
+                <span class="mr-1">👍</span> {{ moment.interactions.likes.length }}
               </span>
-              <span :class="['flex items-center', moment.interactions.comments.length > 0 ? 'text-slate-600' : '']">
+              <span 
+                :class="['flex items-center transition-colors', 
+                  moment.interactions.comments.length > 0 ? 'text-slate-600' : '',
+                  moment.interactions.comments.some(u => u.wxid === store.filterWxid) ? 'text-orange-500 font-bold' : 'hover:text-blue-600']"
+              >
                 <span class="mr-1">💬</span> {{ moment.interactions.comments.length }}
               </span>
             </div>
         </div>
 
         <div 
-          v-if="(moment.interactions.likes && moment.interactions.likes.length > 0) || (moment.interactions.comments && moment.interactions.comments.length > 0)" 
-          class="mt-2 bg-slate-50 p-2 rounded-[4px] relative"
+          v-if="moment.interactions.comments && moment.interactions.comments.length > 0" 
+          class="mt-2 bg-slate-50 p-2 rounded-[4px] space-y-1.5"
         >
-           <div class="absolute -top-1 left-3 w-2 h-2 bg-slate-50 rotate-45 transform"></div>
-
-           <div 
-             v-if="moment.interactions.likes && moment.interactions.likes.length > 0"
-             class="flex flex-wrap items-center text-[11px] leading-snug mb-1.5 pb-1.5 border-b border-slate-200 last:border-0 last:mb-0 last:pb-0"
-           >
-             <Heart class="w-3 h-3 text-slate-400 mr-1.5 shrink-0" />
-             <span v-for="(like, idx) in moment.interactions.likes" :key="idx" class="mr-1">
-                <span 
-                  :class="['cursor-pointer hover:underline font-medium', 
-                    like.wxid === store.filterWxid ? 'text-orange-600 bg-orange-100 rounded px-0.5' : 'text-blue-600']"
-                  @click.stop="store.filterWxid = like.wxid"
-                  :title="like.wxid"
-                >
-                  {{ formatName(like.wxid) }}
-                </span>
-                <span v-if="idx < moment.interactions.likes.length - 1" class="text-slate-400">,</span>
-             </span>
-           </div>
-
-           <div 
-             v-if="moment.interactions.comments && moment.interactions.comments.length > 0" 
-             class="space-y-1"
-           >
-             <div 
-               v-for="(comment, cIdx) in moment.interactions.comments" 
-               :key="cIdx"
-               class="text-[11px] leading-snug flex items-start"
-             >
-               <span 
-                 :class="['font-medium cursor-pointer hover:underline shrink-0 mr-1', 
-                   comment.wxid === store.filterWxid ? 'text-orange-600' : 'text-blue-600']"
-                 @click.stop="store.filterWxid = comment.wxid"
-                 :title="comment.wxid"
-               >
-                 {{ formatName(comment.wxid) }}:
-               </span>
-               <span :class="['break-all', comment.wxid === store.filterWxid ? 'text-slate-900 font-medium' : 'text-slate-600']">
-                 {{ comment.content || '' }}
-               </span>
-             </div>
-           </div>
+          <div 
+            v-for="(comment, cIdx) in moment.interactions.comments" 
+            :key="cIdx"
+            class="text-[11px] leading-snug flex items-start"
+          >
+            <span 
+              :class="['font-medium cursor-pointer hover:underline shrink-0 mr-1', 
+                comment.wxid === store.filterWxid ? 'text-orange-600' : 'text-blue-600']"
+              @click.stop="store.filterWxid = comment.wxid"
+              :title="comment.wxid"
+            >
+              {{ formatName(comment.wxid) }}:
+            </span>
+            
+            <span :class="['break-all', comment.wxid === store.filterWxid ? 'text-slate-900 font-medium' : 'text-slate-600']">
+              {{ comment.content || '' }}
+            </span>
+          </div>
         </div>
         </div>
       
