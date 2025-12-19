@@ -153,22 +153,31 @@ export const useMomentsStore = defineStore('moments', () => {
 
   const filteredMoments = computed(() => {
     let list = moments.value;
-    // 1. 先按左侧选中的人筛选 (看谁的朋友圈)
+
+    // 1. 第一层漏斗：只看左侧选中人的朋友圈 (Author)
     if (selectedWxid.value) {
       list = list.filter(m => m.author_wxid === selectedWxid.value);
     }
-    // 2. 再按中间图谱选中的人筛选 (看他和谁互动)
+
+    // 2. 第二层漏斗：只看中间球选中人的互动 (Interactor)
+    // 🔥 这就是你要的功能！
     if (filterWxid.value) {
       list = list.filter(m => {
-        // 如果他是作者
+        // 如果他是这条朋友圈的作者（比如你自己查看自己）
         if (m.author_wxid === filterWxid.value) return true;
-        // 或者他点赞了
-        if (m.interactions.likes.some(u => u.wxid === filterWxid.value)) return true;
-        // 或者他评论了
-        if (m.interactions.comments.some(c => c.wxid === filterWxid.value)) return true;
-        return false;
+
+        // 如果他点赞了这条朋友圈
+        const hasLiked = m.interactions.likes.some(u => u.wxid === filterWxid.value);
+        if (hasLiked) return true;
+
+        // 如果他评论了这条朋友圈 (包括回复别人)
+        const hasCommented = m.interactions.comments.some(c => c.wxid === filterWxid.value);
+        if (hasCommented) return true;
+
+        return false; // 既没写，没赞，也没评 -> 过滤掉
       });
     }
+
     return list;
   });
 
