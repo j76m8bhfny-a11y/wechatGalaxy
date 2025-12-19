@@ -1,101 +1,184 @@
 import { defineStore } from 'pinia';
-import { ref, computed, shallowRef } from 'vue';
-import rawData from '../assets/moments_full.json';
+import { ref, computed } from 'vue';
+import { useContactsStore } from './contacts';
 
-// --- 类型定义 ---
 export interface Interaction {
   wxid: string;
-  time?: string;
+  name?: string;
+  time?: number;
   content?: string;
+  reply_to_wxid?: string;
+}
+
+export interface MediaItem {
+  type: 'image' | 'video';
+  src: string;
+  thumb?: string;
+}
+
+export interface MomentContent {
+  text: string;
+  media: MediaItem[];
+}
+
+export interface MomentStats {
+  likes_count: number;
+  comments_count: number;
+}
+
+export interface MomentInteractions {
+  likes: Interaction[];
+  comments: Interaction[];
 }
 
 export interface Moment {
   id: string;
-  author_wxid: string;
   timestamp: number;
   date: string;
-  content: {
-    text: string;
-    media: any[];
-  };
-  interactions: {
-    likes: Interaction[];
-    comments: Interaction[];
-  };
+  author_wxid: string;
+  content: MomentContent;
+  stats: MomentStats;
+  interactions: MomentInteractions;
+  avatar: string; 
+  name: string;   
 }
 
-export interface Contact {
+export interface ContactSummary {
   id: string;
-  name: string;
   avatar: string;
+  name: string;
   momentCount: number;
   latestDate: string;
 }
 
-// --- Store ---
 export const useMomentsStore = defineStore('moments', () => {
-  const moments = shallowRef<Moment[]>(rawData as any as Moment[]);
-  
-  // 1. 当前选中的核心人物 (Author)
+  const moments = ref<Moment[]>([]);
   const selectedWxid = ref<string>('');
-
-  // 2. 🆕 新增：当前选中的互动者 (用于筛选右侧内容)
-  // 如果为空，显示所有朋友圈；如果不为空，只显示和他有关的
   const filterWxid = ref<string>('');
+  
+  const contactStore = useContactsStore();
+  
+  // 💾 内部缓存：记录所有出现过的 wxid -> name 映射
+  // 来源包括：通讯录、朋友圈作者、点赞列表快照、评论列表快照
+  const globalUserMap = ref<Map<string, string>>(new Map());
 
-  // 3. 计算联系人列表 (侧边栏用)
+  // 📥 加载数据并构建“全员户口本”
+  const loadFeeds = (rawFeeds: any[]) => {
+    console.log(`📦 加载 ${rawFeeds.length} 条数据，正在构建全员索引...`);
+    const map = new Map<string, string>();
+
+    rawFeeds.forEach(feed => {
+      // 1. 记录发帖人 (如果有快照名虽少见，但也记录)
+      if (feed.author_wxid) {
+        // 这里的名字稍后由 ContactStore 补全，先占位
+        if (!map.has(feed.author_wxid)) map.set(feed.author_wxid, '');
+      }
+
+      // 2. 记录点赞人 (利用 Python 传回来的 name)
+      if (feed.interactions?.likes) {
+        feed.interactions.likes.forEach((u: any) => {
+          if (u.wxid && u.name) map.set(u.wxid, u.name);
+        });
+      }
+
+      // 3. 记录评论人
+      if (feed.interactions?.comments) {
+        feed.interactions.comments.forEach((c: any) => {
+          if (c.wxid && c.name) map.set(c.wxid, c.name);
+        });
+      }
+    });
+    
+    globalUserMap.value = map;
+
+    // 转换数据结构
+    moments.value = rawFeeds.map(feed => ({
+      id: feed.id,
+      timestamp: feed.timestamp,
+      date: feed.date || new Date(feed.timestamp * 1000).toLocaleString(),
+      author_wxid: feed.author_wxid,
+      content: feed.content || { text: '', media: [] },
+      stats: feed.stats || { likes_count: 0, comments_count: 0 },
+      interactions: feed.interactions || { likes: [], comments: [] },
+      avatar: '👤', 
+      name: '加载中...', 
+    }));
+  };
+
+  // 🔍 超级查名器 (核心功能)
+  // 任何组件想知道某个 wxid 叫什么，都调这个，别自己瞎查
+  const getSmartName = (wxid: string) => {
+    if (!wxid) return '未知';
+    
+    // 1. 优先查通讯录 (备注名最准)
+    const contactName = contactStore.getDisplayName(wxid);
+    if (contactName && contactName !== '未知用户' && contactName !== wxid) {
+      return contactName;
+    }
+
+    // 2. 查全员快照 (朋友圈里留下的历史名字)
+    const snapshotName = globalUserMap.value.get(wxid);
+    if (snapshotName && snapshotName.length > 0) {
+      return snapshotName;
+    }
+
+    // 3. 实在没有，返回 wxid
+    return wxid;
+  };
+
+  // 左侧列表：只显示发过朋友圈的人 (保持界面整洁)
+  // 如果你想让点赞的人也出现在左侧，可以改这里，但通常没必要
   const contacts = computed(() => {
-    const map = new Map<string, Contact>();
-    moments.value.forEach((m) => {
-      const wxid = m.author_wxid;
-      if (!map.has(wxid)) {
-        map.set(wxid, {
-          id: wxid,
-          name: wxid,
-          avatar: wxid.substring(0, 1).toUpperCase(),
+    const map = new Map<string, ContactSummary>();
+    moments.value.forEach(m => {
+      const uid = m.author_wxid;
+      if (!uid) return;
+      
+      if (!map.has(uid)) {
+        map.set(uid, {
+          id: uid,
+          avatar: '👤',
+          name: getSmartName(uid), // 使用超级查名
           momentCount: 0,
           latestDate: m.date
         });
       }
-      const contact = map.get(wxid)!;
-      contact.momentCount++;
-      if (m.date > contact.latestDate) contact.latestDate = m.date;
+      const c = map.get(uid)!;
+      c.momentCount++;
+      if (m.date > c.latestDate) c.latestDate = m.date;
     });
-    return Array.from(map.values()).sort((a, b) => b.latestDate.localeCompare(a.latestDate));
-  });
-
-  // 4. 获取当前核心人物的所有朋友圈
-  const currentMoments = computed(() => {
-    if (!selectedWxid.value) return [];
-    return moments.value.filter((m) => m.author_wxid === selectedWxid.value);
-  });
-
-  // 5. 🆕 新增：过滤后的展示列表 (Feed 用)
-  const filteredMoments = computed(() => {
-    // 如果没有核心人物，返回空
-    if (!selectedWxid.value) return [];
     
-    // 基础列表：核心人物的所有朋友圈
-    const baseList = currentMoments.value;
+    return Array.from(map.values()).sort((a, b) => b.momentCount - a.momentCount);
+  });
 
-    // 如果没有设置筛选人，直接返回全部
-    if (!filterWxid.value) return baseList;
-
-    // 核心逻辑：只保留 filterWxid 参与互动的条目
-    const targetId = filterWxid.value;
-    return baseList.filter(m => {
-      const hasLike = m.interactions?.likes?.some(u => u.wxid === targetId);
-      const hasComment = m.interactions?.comments?.some(u => u.wxid === targetId);
-      return hasLike || hasComment;
-    });
+  const filteredMoments = computed(() => {
+    let list = moments.value;
+    // 1. 先按左侧选中的人筛选 (看谁的朋友圈)
+    if (selectedWxid.value) {
+      list = list.filter(m => m.author_wxid === selectedWxid.value);
+    }
+    // 2. 再按中间图谱选中的人筛选 (看他和谁互动)
+    if (filterWxid.value) {
+      list = list.filter(m => {
+        // 如果他是作者
+        if (m.author_wxid === filterWxid.value) return true;
+        // 或者他点赞了
+        if (m.interactions.likes.some(u => u.wxid === filterWxid.value)) return true;
+        // 或者他评论了
+        if (m.interactions.comments.some(c => c.wxid === filterWxid.value)) return true;
+        return false;
+      });
+    }
+    return list;
   });
 
   return {
     moments,
-    contacts,
     selectedWxid,
-    filterWxid,      // 导出给组件用
-    currentMoments,
-    filteredMoments  // 导出给 Feed 用
+    filterWxid,
+    loadFeeds,
+    filteredMoments,
+    contacts,
+    getSmartName // 👈 暴露出这个新方法
   };
 });

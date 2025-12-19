@@ -7,6 +7,17 @@
     "core:default",
     "fs:default",
     "fs:allow-read-file",
+    "shell:allow-execute",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/decrypt-engine",
+          "cmd": "",
+          "args": []
+        }
+      ]
+    },
     {
       "identifier": "fs:scope",
       "allow": ["$HOME/**", "C:\\**", "D:\\**", "E:\\**", "F:\\**"]

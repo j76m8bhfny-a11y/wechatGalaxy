@@ -1,177 +1,152 @@
 <script setup lang="ts">
 import { useMomentsStore } from '../stores/moments';
 import { useContactsStore } from '../stores/contacts';
-import { MoreHorizontal, FilterX, Heart } from 'lucide-vue-next';
-import { convertFileSrc } from '@tauri-apps/api/core';
+//import { computed } from 'vue';
+import { MessageSquare, Heart, Share2, MoreHorizontal } from 'lucide-vue-next';
 
 const store = useMomentsStore();
 const contactStore = useContactsStore();
 
-const formatDate = (timestamp: number) => {
-  return new Date(timestamp * 1000).toLocaleString('zh-CN', {
-    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-  });
-};
-
-const getGridClass = (count: number) => {
-  if (count === 1) return 'grid-cols-1 w-2/3';
-  if (count === 4) return 'grid-cols-2 w-2/3';
-  return 'grid-cols-3';
-};
-
-const clearFilter = () => {
-  store.filterWxid = '';
-};
-
-// 🆕 2. 核心函数：处理图片路径
-const getMediaSrc = (path: string) => {
-  if (!path) return '';
-  
-  // 如果已经是网络图片 (http开头)，直接用
-  if (path.startsWith('http') || path.startsWith('https')) {
-    return path;
+// 核心逻辑：获取显示名称
+// 优先策略：
+// 1. 如果是互动列表(点赞/评论)传来的 snapshotName (数据库里的历史昵称)，直接用。
+// 2. 如果没有，去通讯录 Store 里查现在的备注或昵称。
+// 3. 如果还没查到，显示 wxid 或 "未知用户"。
+const getDisplayName = (wxid: string, snapshotName?: string) => {
+  if (snapshotName && snapshotName.length > 0) {
+    return snapshotName;
   }
-  
-  // 如果是本地路径 (C:\...), 使用 Tauri 转换
-  // convertFileSrc 会自动处理 Windows 的反斜杠问题
-  return convertFileSrc(path);
+  return contactStore.getDisplayName(wxid) || '未知用户';
+};
+
+// 格式化媒体网格布局
+const getGridClass = (count: number) => {
+  if (count === 1) return 'grid-cols-1 max-w-[60%]'; // 单张图限制宽度
+  if (count === 2) return 'grid-cols-2 max-w-[300px]';
+  if (count === 4) return 'grid-cols-2 max-w-[300px]'; // 4张图也是田字格
+  return 'grid-cols-3'; // 其他情况九宫格
 };
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-white text-sm">
-    
-    <div class="h-12 border-b border-slate-100 flex items-center justify-between px-4 bg-white shrink-0 z-10">
-      <div class="flex items-center space-x-2 overflow-hidden">
-        <span class="font-bold text-slate-700 whitespace-nowrap">情报档案</span>
-        <div v-if="store.filterWxid" class="flex items-center space-x-1 bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full cursor-pointer hover:bg-orange-100 transition-colors" @click="clearFilter">
-           <span class="text-xs truncate max-w-[120px]">与 {{ contactStore.getDisplayName(store.filterWxid) }} 的互动</span>
-           <FilterX class="h-3 w-3" />
-        </div>
-        <span v-else-if="store.selectedWxid" class="text-xs text-slate-400 px-2 py-0.5 bg-slate-100 rounded-full truncate max-w-[150px]">
-           {{ contactStore.getDisplayName(store.selectedWxid) }}
-        </span>
-      </div>
-      <button class="p-1.5 hover:bg-slate-50 rounded text-slate-400">
-        <MoreHorizontal class="h-4 w-4" />
-      </button>
-    </div>
-
-    <div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+  <div class="h-full bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
+    <div class="max-w-3xl mx-auto space-y-6">
       
-      <div v-if="!store.selectedWxid" class="flex flex-col items-center justify-center h-full text-slate-400 space-y-2">
-        <div class="text-4xl">📂</div>
-        <p>请在左侧选择一位联系人</p>
-      </div>
-
-      <div v-else-if="store.filteredMoments.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400 space-y-2">
-        <div class="text-4xl">🔍</div>
-        <p>暂无相关互动记录</p>
-        <button @click="clearFilter" class="text-blue-500 text-xs hover:underline">查看全部动态</button>
-      </div>
-
       <div 
-        v-else
         v-for="moment in store.filteredMoments" 
         :key="moment.id"
-        class="bg-white rounded border border-slate-200 shadow-sm p-3 hover:shadow-md transition-shadow cursor-default"
+        class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 transition-shadow hover:shadow-md"
       >
-        <div class="flex justify-between items-start mb-2">
-            <div class="flex items-center space-x-2">
-              <span class="font-bold text-slate-800 text-xs truncate max-w-[150px]">
-                {{ contactStore.getDisplayName(moment.author_wxid) }}
-              </span>
-              <span class="text-[10px] text-slate-400">
-                {{ formatDate(moment.timestamp) }}
-              </span>
+        <div class="flex items-start mb-3">
+          <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3 shrink-0 text-lg">
+            {{ moment.avatar }}
+          </div>
+          
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="font-bold text-slate-800 text-sm md:text-base cursor-pointer hover:text-blue-600">
+                  {{ getDisplayName(moment.author_wxid) }}
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5 font-mono">{{ moment.date }}</p>
+              </div>
+              <button class="text-slate-300 hover:text-slate-500">
+                <MoreHorizontal class="h-5 w-5" />
+              </button>
             </div>
-        </div>
-        
-        <p v-if="moment.content.text" class="text-xs text-slate-700 leading-relaxed mb-2.5 whitespace-pre-wrap">
-          {{ moment.content.text }}
-        </p>
-        
-        <div 
-          v-if="moment.content.media && moment.content.media.length > 0"
-          :class="['grid gap-1 mb-3', getGridClass(moment.content.media.length)]"
-        >
-          <div 
-            v-for="(media, idx) in moment.content.media" 
-            :key="idx"
-            class="aspect-square bg-slate-100 rounded-sm overflow-hidden border border-slate-100 relative group"
-          >
-             <img 
-               :src="getMediaSrc(media.thumb || media.url)" 
-               class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-               loading="lazy"
-               @error="(e) => (e.target as HTMLImageElement).src = 'https://placehold.co/100?text=Error'"
-             />
           </div>
         </div>
 
-        <div class="flex items-center justify-between pt-2 border-t border-slate-50">
-            <div class="flex space-x-3 text-[10px] text-slate-400">
-              <span :class="['flex items-center', moment.interactions.likes.length > 0 ? 'text-slate-600' : '']">
-                <Heart class="w-3 h-3 mr-1" /> {{ moment.interactions.likes.length }}
-              </span>
-              <span :class="['flex items-center', moment.interactions.comments.length > 0 ? 'text-slate-600' : '']">
-                <span class="mr-1">💬</span> {{ moment.interactions.comments.length }}
-              </span>
-            </div>
+        <div class="mb-3 text-slate-700 text-sm md:text-base whitespace-pre-wrap leading-relaxed select-text">
+          {{ moment.content.text }}
         </div>
 
         <div 
-          v-if="(moment.interactions.likes && moment.interactions.likes.length > 0) || (moment.interactions.comments && moment.interactions.comments.length > 0)" 
-          class="mt-2 bg-slate-50 p-2 rounded-[4px] relative"
+          v-if="moment.content.media && moment.content.media.length > 0" 
+          :class="['grid gap-1.5 mb-4', getGridClass(moment.content.media.length)]"
         >
-           <div class="absolute -top-1 left-3 w-2 h-2 bg-slate-50 rotate-45 transform"></div>
+          <div 
+            v-for="(item, idx) in moment.content.media" 
+            :key="idx" 
+            class="aspect-square bg-slate-100 rounded-lg overflow-hidden relative group border border-slate-200"
+          >
+            <img 
+              v-if="item.type === 'image'"
+              :src="item.src" 
+              class="w-full h-full object-cover transition-transform group-hover:scale-105 cursor-zoom-in"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              alt="Moment Image"
+            />
+            
+            <video 
+              v-else
+              :src="item.src" 
+              class="w-full h-full object-cover"
+              controls 
+              preload="metadata"
+              referrerpolicy="no-referrer"
+            ></video>
+          </div>
+        </div>
 
-           <div 
-             v-if="moment.interactions.likes && moment.interactions.likes.length > 0"
-             class="flex flex-wrap items-center text-[11px] leading-snug mb-1.5 pb-1.5 border-b border-slate-200 last:border-0 last:mb-0 last:pb-0"
-           >
-             <Heart class="w-3 h-3 text-slate-400 mr-1.5 shrink-0" />
-             <span v-for="(like, idx) in moment.interactions.likes" :key="idx" class="mr-1">
-                <span 
-                  :class="['cursor-pointer hover:underline font-medium', 
-                    like.wxid === store.filterWxid ? 'text-orange-600 bg-orange-100 rounded px-0.5' : 'text-blue-600']"
-                  @click.stop="store.filterWxid = like.wxid"
-                  :title="like.wxid"
-                >
-                  {{ contactStore.getDisplayName(like.wxid) }}
-                </span>
-                <span v-if="idx < moment.interactions.likes.length - 1" class="text-slate-400">,</span>
+        <div class="flex items-center justify-between pt-3 border-t border-slate-50">
+          <div class="flex space-x-6">
+            <button class="flex items-center space-x-1.5 text-slate-500 hover:text-pink-500 transition-colors group">
+              <Heart class="h-4 w-4 group-hover:fill-current" />
+              <span class="text-xs font-medium">{{ moment.stats.likes_count || '赞' }}</span>
+            </button>
+            
+            <button class="flex items-center space-x-1.5 text-slate-500 hover:text-blue-500 transition-colors">
+              <MessageSquare class="h-4 w-4" />
+              <span class="text-xs font-medium">{{ moment.stats.comments_count || '评论' }}</span>
+            </button>
+            
+            <button class="flex items-center space-x-1.5 text-slate-500 hover:text-green-500 transition-colors">
+              <Share2 class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div v-if="moment.interactions && moment.interactions.likes.length > 0" class="mt-3 bg-slate-50 rounded-lg p-3 text-xs text-slate-600 flex items-start">
+           <Heart class="h-3 w-3 mt-1 mr-2 text-slate-400 shrink-0" />
+           <div class="flex flex-wrap gap-1 leading-5">
+             <span v-for="(like, index) in moment.interactions.likes" :key="like.wxid" class="group">
+               <span class="text-blue-700 font-semibold cursor-pointer hover:underline">
+                 {{ getDisplayName(like.wxid, like.name) }}
+               </span>
+               <span v-if="index < moment.interactions.likes.length - 1">, </span>
              </span>
            </div>
+        </div>
 
-           <div 
-             v-if="moment.interactions.comments && moment.interactions.comments.length > 0" 
-             class="space-y-1"
-           >
-             <div 
-               v-for="(comment, cIdx) in moment.interactions.comments" 
-               :key="cIdx"
-               class="text-[11px] leading-snug flex items-start"
-             >
-               <span 
-                 :class="['font-medium cursor-pointer hover:underline shrink-0 mr-1', 
-                   comment.wxid === store.filterWxid ? 'text-orange-600' : 'text-blue-600']"
-                 @click.stop="store.filterWxid = comment.wxid"
-                 :title="comment.wxid"
-               >
-                 {{ contactStore.getDisplayName(comment.wxid) }}:
-               </span>
-               <span :class="['break-all', comment.wxid === store.filterWxid ? 'text-slate-900 font-medium' : 'text-slate-600']">
-                 {{ comment.content || '' }}
-               </span>
-             </div>
+        <div v-if="moment.interactions && moment.interactions.comments.length > 0" class="mt-1 bg-slate-50 rounded-lg p-3 text-xs space-y-1.5">
+           <div v-for="(cmt, idx) in moment.interactions.comments" :key="idx" class="flex flex-wrap items-baseline leading-relaxed">
+              
+              <span class="text-blue-700 font-semibold shrink-0 cursor-pointer hover:underline">
+                {{ getDisplayName(cmt.wxid, cmt.name) }}
+              </span>
+
+              <span v-if="cmt.reply_to_wxid" class="text-slate-400 mx-1">
+                回复
+              </span>
+              <span v-if="cmt.reply_to_wxid" class="text-blue-700 font-semibold cursor-pointer hover:underline">
+                {{ getDisplayName(cmt.reply_to_wxid) }}
+              </span>
+
+              <span class="text-slate-400 font-bold mx-0.5">:</span>
+              <span class="text-slate-700 select-text">{{ cmt.content }}</span>
            </div>
         </div>
 
       </div>
-      
-      <div v-if="store.filteredMoments.length > 0" class="text-center text-[10px] text-slate-300 py-4">
-        —— 筛选出 {{ store.filteredMoments.length }} 条相关动态 ——
+
+      <div v-if="store.moments.length === 0" class="flex flex-col items-center justify-center py-20 text-slate-400">
+        <div class="bg-slate-100 p-4 rounded-full mb-4">
+          <MessageSquare class="h-8 w-8 text-slate-300" />
+        </div>
+        <p class="text-sm font-medium">暂无数据</p>
+        <p class="text-xs mt-1 text-slate-300">请点击左上角的“扫描”按钮获取朋友圈</p>
       </div>
 
     </div>
@@ -179,14 +154,15 @@ const getMediaSrc = (path: string) => {
 </template>
 
 <style scoped>
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
+/* 隐藏默认滚动条但保留滚动功能 (可选优化) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: #f1f5f9;
-  border-radius: 4px;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
+  border-radius: 20px;
 }
 </style>
